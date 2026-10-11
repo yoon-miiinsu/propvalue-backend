@@ -10,9 +10,11 @@ const SERVICE_KEY = process.env.MOLIT_SERVICE_KEY;
 const CODEF_CLIENT_ID = process.env.CODEF_CLIENT_ID;
 const CODEF_CLIENT_SECRET = process.env.CODEF_CLIENT_SECRET;
 
-// CODEF Token 발급
+// 1. CODEF OAuth 토큰 발급 (안전 예외처리)
 async function getCodefToken() {
-  if (!CODEF_CLIENT_ID || !CODEF_CLIENT_SECRET) return null;
+  if (!CODEF_CLIENT_ID || !CODEF_CLIENT_SECRET) {
+    return null;
+  }
   const authHeader = Buffer.from(`${CODEF_CLIENT_ID}:${CODEF_CLIENT_SECRET}`).toString('base64');
   try {
     const response = await fetch('https://oauth.codef.io/oauth/token', {
@@ -26,12 +28,12 @@ async function getCodefToken() {
     const data = await response.json();
     return data.access_token || null;
   } catch (error) {
-    console.error('CODEF Token Error:', error.message);
+    console.error('CODEF Token Fetch Error:', error.message);
     return null;
   }
 }
 
-// CODEF 실시간 경매 API (디버깅 방어 로직 적용)
+// 2. CODEF 경매 연동 API (에러 발생 시 백엔드 다운 방지)
 app.get('/api/codef-auction-real', async (req, res) => {
   const { regionCode, buildingType } = req.query;
 
@@ -58,17 +60,19 @@ app.get('/api/codef-auction-real', async (req, res) => {
     let auctionList = result.data || [];
     if (!Array.isArray(auctionList)) auctionList = [auctionList];
 
-    res.json({ success: true, data: auctionList });
+    return res.json({ success: true, data: auctionList });
   } catch (error) {
-    console.error('CODEF API Call Error:', error.message);
-    res.json({ success: true, data: [] }); // 에러 시 빈 배열 반환하여 프론트엔드 다운 방지
+    console.error('CODEF Auction API Error:', error.message);
+    return res.json({ success: true, data: [] });
   }
 });
 
-// 국토부 아파트 실거래가 API
+// 3. 국토부 아파트 매매 실거래가 API
 app.get('/api/apt-trades', async (req, res) => {
   const { lawdCd, dealYmd } = req.query;
-  if (!lawdCd || !dealYmd) return res.status(400).json({ success: false });
+  if (!lawdCd || !dealYmd) {
+    return res.status(400).json({ success: false, message: 'LAWD_CD와 DEAL_YMD가 필요합니다.' });
+  }
 
   try {
     const url = `http://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev?serviceKey=${SERVICE_KEY}&LAWD_CD=${lawdCd}&DEAL_YMD=${dealYmd}&numOfRows=100&_type=json`;
@@ -78,16 +82,19 @@ app.get('/api/apt-trades', async (req, res) => {
     let items = data.response?.body?.items?.item || [];
     if (!Array.isArray(items)) items = items ? [items] : [];
 
-    res.json({ success: true, type: 'apt', dealYmd, data: items });
+    return res.json({ success: true, type: 'apt', dealYmd, data: items });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    console.error('APT Trade API Error:', error.message);
+    return res.json({ success: false, data: [] });
   }
 });
 
-// 국토부 빌라 실거래가 API
+// 4. 국토부 빌라/다세대 매매 실거래가 API
 app.get('/api/villa-trades', async (req, res) => {
   const { lawdCd, dealYmd } = req.query;
-  if (!lawdCd || !dealYmd) return res.status(400).json({ success: false });
+  if (!lawdCd || !dealYmd) {
+    return res.status(400).json({ success: false, message: 'LAWD_CD와 DEAL_YMD가 필요합니다.' });
+  }
 
   try {
     const url = `http://apis.data.go.kr/1613000/RTMSDataSvcRHTrade/getRTMSDataSvcRHTrade?serviceKey=${SERVICE_KEY}&LAWD_CD=${lawdCd}&DEAL_YMD=${dealYmd}&numOfRows=100&_type=json`;
@@ -97,10 +104,15 @@ app.get('/api/villa-trades', async (req, res) => {
     let items = data.response?.body?.items?.item || [];
     if (!Array.isArray(items)) items = items ? [items] : [];
 
-    res.json({ success: true, type: 'villa', dealYmd, data: items });
+    return res.json({ success: true, type: 'villa', dealYmd, data: items });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    console.error('Villa Trade API Error:', error.message);
+    return res.json({ success: false, data: [] });
   }
+});
+
+app.get('/', (req, res) => {
+  res.send('PropValue Backend Running');
 });
 
 app.listen(PORT, () => {
