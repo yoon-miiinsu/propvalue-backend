@@ -8,7 +8,7 @@ app.use(express.json());
 const PORT = process.env.PORT || 5000;
 const SERVICE_KEY = process.env.MOLIT_SERVICE_KEY;
 
-// CODEF 대법원 경매 샘플/모의 데이터 (Dummy Data)
+// CODEF 대법원 경매 모의 데이터
 const mockAuctionCases = [
   {
     resCaseNo: "2024타경10284",
@@ -18,7 +18,7 @@ const mockAuctionCases = [
     resAppraisementAmt: 1850000000,
     resMinLowerPrice: 1280000000,
     resAuctionState: "낙찰",
-    resAddress: "서울특별시 강남구 대치동 은마아파트 102동 5층",
+    resAddress: "서울특별시 강남구 대치동 941 은마아파트 102동 5층",
     resArea: 84.99
   },
   {
@@ -45,7 +45,7 @@ const mockAuctionCases = [
   }
 ];
 
-// 1. 아파트 매매 실거래가 API
+// 아파트 실거래가 API
 app.get('/api/apt-trades', async (req, res) => {
   const { lawdCd, dealYmd } = req.query;
   if (!lawdCd || !dealYmd) {
@@ -69,7 +69,7 @@ app.get('/api/apt-trades', async (req, res) => {
   }
 });
 
-// 2. 연립/다세대(빌라) 매매 실거래가 API
+// 빌라/다세대 실거래가 API
 app.get('/api/villa-trades', async (req, res) => {
   const { lawdCd, dealYmd } = req.query;
   if (!lawdCd || !dealYmd) {
@@ -93,7 +93,7 @@ app.get('/api/villa-trades', async (req, res) => {
   }
 });
 
-// 3. CODEF 경매 사건 모의 조회 API
+// CODEF 경매 사건 모의 API
 app.get('/api/codef-auction-mock', (req, res) => {
   const { regionCode, buildingType } = req.query;
 
@@ -105,11 +105,7 @@ app.get('/api/codef-auction-mock', (req, res) => {
     result = result.filter(item => item.resBuildingType === buildingType);
   }
 
-  res.json({
-    resultCode: "0000",
-    resultMessage: "성공",
-    data: result
-  });
+  res.json({ resultCode: "0000", resultMessage: "성공", data: result });
 });
 
 app.listen(PORT, () => {
