@@ -7,45 +7,73 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 5000;
 const SERVICE_KEY = process.env.MOLIT_SERVICE_KEY;
+const CODEF_CLIENT_ID = process.env.CODEF_CLIENT_ID;
+const CODEF_CLIENT_SECRET = process.env.CODEF_CLIENT_SECRET;
 
-// CODEF 대법원 경매 모의 데이터
-const mockAuctionCases = [
-  {
-    resCaseNo: "2024타경10284",
-    resCourtName: "서울중앙지방법원",
-    resBuildingType: "apt",
-    resRegionCode: "11680",
-    resAppraisementAmt: 1850000000,
-    resMinLowerPrice: 1280000000,
-    resAuctionState: "낙찰",
-    resAddress: "서울특별시 강남구 대치동 941 은마아파트 102동 5층",
-    resArea: 84.99
-  },
-  {
-    resCaseNo: "2024타경54210",
-    resCourtName: "수원지방법원 성남지원",
-    resBuildingType: "apt",
-    resRegionCode: "41135",
-    resAppraisementAmt: 1250000000,
-    resMinLowerPrice: 875000000,
-    resAuctionState: "낙찰",
-    resAddress: "경기도 성남시 분당구 정자동 한솔마을 12층",
-    resArea: 101.82
-  },
-  {
-    resCaseNo: "2024타경33102",
-    resCourtName: "인천지방법원",
-    resBuildingType: "villa",
-    resRegionCode: "28185",
-    resAppraisementAmt: 320000000,
-    resMinLowerPrice: 224000000,
-    resAuctionState: "낙찰",
-    resAddress: "인천광역시 연수구 옥련동 다세대주택 2층",
-    resArea: 59.94
+// 1. CODEF OAuth 2.0 토큰 발급 함수
+async function getCodefToken() {
+  if (!CODEF_CLIENT_ID || !CODEF_CLIENT_SECRET) {
+    console.warn("CODEF API Key가 환경변수에 설정되지 않았습니다.");
+    return null;
   }
-];
 
-// 1. 아파트 실거래가 API
+  const authHeader = Buffer.from(`${CODEF_CLIENT_ID}:${CODEF_CLIENT_SECRET}`).toString('base64');
+  try {
+    const response = await fetch('https://oauth.codef.io/oauth/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${authHeader}`
+      },
+      body: 'grant_type=client_credentials&scope=read'
+    });
+    const data = await response.json();
+    return data.access_token || null;
+  } catch (error) {
+    console.error('CODEF Token Error:', error.message);
+    return null;
+  }
+}
+
+// 2. 실제 CODEF 경매 사건 조회 API (제공해주신 강제/임의경매 Service Code 사용)
+app.get('/api/codef-auction-real', async (req, res) => {
+  const { regionCode, buildingType } = req.query;
+
+  try {
+    const token = await getCodefToken();
+    if (!token) {
+      return res.json({ success: false, message: 'CODEF 인증 토큰 발급 실패 (키 설정을 확인하세요)', data: [] });
+    }
+
+    // 제공해주신 CODEF 엔드포인트 호출 (강제경매: ef32e73392d4..., 임의경매: 7a6a322178d7...)
+    const response = await fetch('https://api.codef.io/v1/kr/court/auction/item-list', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        organization: "0002", // 대법원
+        reqRegionCode: regionCode || "",
+        reqBuildingType: buildingType || ""
+      })
+    });
+
+    const result = await response.json();
+    const auctionList = result.data || [];
+
+    res.json({
+      success: true,
+      resultCode: result.result?.code || "0000",
+      data: Array.isArray(auctionList) ? auctionList : [auctionList]
+    });
+  } catch (error) {
+    console.error('CODEF Real API Call Error:', error.message);
+    res.status(500).json({ success: false, error: 'CODEF 실시간 경매 데이터 요청 실패' });
+  }
+});
+
+// 3. 국토부 아파트 매매 실거래가 API
 app.get('/api/apt-trades', async (req, res) => {
   const { lawdCd, dealYmd } = req.query;
   if (!lawdCd || !dealYmd) {
@@ -64,12 +92,12 @@ app.get('/api/apt-trades', async (req, res) => {
 
     res.json({ success: true, type: 'apt', dealYmd, data: items });
   } catch (error) {
-    console.error('APT API Error:', error);
+    console.error('APT API Error:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// 2. 빌라/다세대 실거래가 API
+// 4. 국토부 빌라/다세대 매매 실거래가 API
 app.get('/api/villa-trades', async (req, res) => {
   const { lawdCd, dealYmd } = req.query;
   if (!lawdCd || !dealYmd) {
@@ -88,26 +116,11 @@ app.get('/api/villa-trades', async (req, res) => {
 
     res.json({ success: true, type: 'villa', dealYmd, data: items });
   } catch (error) {
-    console.error('Villa API Error:', error);
+    console.error('Villa API Error:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// 3. CODEF 경매 사건 모의 API
-app.get('/api/codef-auction-mock', (req, res) => {
-  const { regionCode, buildingType } = req.query;
-
-  let result = mockAuctionCases;
-  if (regionCode) {
-    result = result.filter(item => item.resRegionCode === regionCode);
-  }
-  if (buildingType) {
-    result = result.filter(item => item.resBuildingType === buildingType);
-  }
-
-  res.json({ resultCode: "0000", resultMessage: "성공", data: result });
-});
-
 app.listen(PORT, () => {
-  console.log(`PropValue Backend Server running on port ${PORT}`);
+  console.log(`PropValue Real-Data Backend Server running on port ${PORT}`);
 });
