@@ -45,7 +45,7 @@ const mockAuctionCases = [
   }
 ];
 
-// 아파트 실거래가 API
+// 1. 아파트 실거래가 API
 app.get('/api/apt-trades', async (req, res) => {
   const { lawdCd, dealYmd } = req.query;
   if (!lawdCd || !dealYmd) {
@@ -62,14 +62,14 @@ app.get('/api/apt-trades', async (req, res) => {
       items = items ? [items] : [];
     }
 
-    res.json({ success: true, type: 'apt', data: items });
+    res.json({ success: true, type: 'apt', dealYmd, data: items });
   } catch (error) {
     console.error('APT API Error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// 빌라/다세대 실거래가 API
+// 2. 빌라/다세대 실거래가 API
 app.get('/api/villa-trades', async (req, res) => {
   const { lawdCd, dealYmd } = req.query;
   if (!lawdCd || !dealYmd) {
@@ -86,14 +86,14 @@ app.get('/api/villa-trades', async (req, res) => {
       items = items ? [items] : [];
     }
 
-    res.json({ success: true, type: 'villa', data: items });
+    res.json({ success: true, type: 'villa', dealYmd, data: items });
   } catch (error) {
     console.error('Villa API Error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// CODEF 경매 사건 모의 API
+// 3. CODEF 경매 사건 모의 API
 app.get('/api/codef-auction-mock', (req, res) => {
   const { regionCode, buildingType } = req.query;
 
