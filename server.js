@@ -14,7 +14,7 @@ const mockAuctionCases = [
     resCaseNo: "2024타경10284",
     resCourtName: "서울중앙지방법원",
     resBuildingType: "apt",
-    resRegionCode: "11680", // 서울 강남구
+    resRegionCode: "11680",
     resAppraisementAmt: 1850000000,
     resMinLowerPrice: 1280000000,
     resAuctionState: "낙찰",
@@ -25,7 +25,7 @@ const mockAuctionCases = [
     resCaseNo: "2024타경54210",
     resCourtName: "수원지방법원 성남지원",
     resBuildingType: "apt",
-    resRegionCode: "41135", // 경기 성남 분당구
+    resRegionCode: "41135",
     resAppraisementAmt: 1250000000,
     resMinLowerPrice: 875000000,
     resAuctionState: "낙찰",
@@ -35,8 +35,8 @@ const mockAuctionCases = [
   {
     resCaseNo: "2024타경33102",
     resCourtName: "인천지방법원",
-    resBuildingType: "villa", // 빌라/다세대
-    resRegionCode: "28185", // 인천 연수구
+    resBuildingType: "villa",
+    resRegionCode: "28185",
     resAppraisementAmt: 320000000,
     resMinLowerPrice: 224000000,
     resAuctionState: "낙찰",
@@ -53,15 +53,18 @@ app.get('/api/apt-trades', async (req, res) => {
   }
 
   try {
-    const url = `http://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev?serviceKey=${SERVICE_KEY}&LAWD_CD=${lawdCd}&DEAL_YMD=${dealYmd}&numOfRows=200&_type=json`;
+    const url = `http://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev?serviceKey=${SERVICE_KEY}&LAWD_CD=${lawdCd}&DEAL_YMD=${dealYmd}&numOfRows=100&_type=json`;
     const response = await fetch(url);
     const data = await response.json();
-    const items = data.response?.body?.items?.item || [];
-    const itemList = Array.isArray(items) ? items : [items];
+    
+    let items = data.response?.body?.items?.item || [];
+    if (!Array.isArray(items)) {
+      items = items ? [items] : [];
+    }
 
-    res.json({ success: true, type: 'apt', data: itemList });
+    res.json({ success: true, type: 'apt', data: items });
   } catch (error) {
-    console.error(error);
+    console.error('APT API Error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -74,20 +77,23 @@ app.get('/api/villa-trades', async (req, res) => {
   }
 
   try {
-    const url = `http://apis.data.go.kr/1613000/RTMSDataSvcRHTrade/getRTMSDataSvcRHTrade?serviceKey=${SERVICE_KEY}&LAWD_CD=${lawdCd}&DEAL_YMD=${dealYmd}&numOfRows=200&_type=json`;
+    const url = `http://apis.data.go.kr/1613000/RTMSDataSvcRHTrade/getRTMSDataSvcRHTrade?serviceKey=${SERVICE_KEY}&LAWD_CD=${lawdCd}&DEAL_YMD=${dealYmd}&numOfRows=100&_type=json`;
     const response = await fetch(url);
     const data = await response.json();
-    const items = data.response?.body?.items?.item || [];
-    const itemList = Array.isArray(items) ? items : [items];
 
-    res.json({ success: true, type: 'villa', data: itemList });
+    let items = data.response?.body?.items?.item || [];
+    if (!Array.isArray(items)) {
+      items = items ? [items] : [];
+    }
+
+    res.json({ success: true, type: 'villa', data: items });
   } catch (error) {
-    console.error(error);
+    console.error('Villa API Error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// 3. CODEF 경매 사건 모의 조회 API (Dummy Data)
+// 3. CODEF 경매 사건 모의 조회 API
 app.get('/api/codef-auction-mock', (req, res) => {
   const { regionCode, buildingType } = req.query;
 
